@@ -1,10 +1,13 @@
-/* spm_aribrain_tdp
- * c = spm_aribrain_tdp(a,b);
+/* 
+ * spm_aribrain_tdp
+ * clusterlist = spm_aribrain_tdp(m,dims,maskI,indexp,ordp,rankp,conn,p);
  * Compute maximal clusters using adaptive thresholding algorithm.
 */
+
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 #include "spm_aribrain.h"
+
 #include <iostream>
 #include <vector>
 #include <list>
@@ -12,12 +15,23 @@
 #include <iterator>
 #include <cmath>
 
-using namespace matlab::data;
-using matlab::mex::ArgumentList;
-
 class MexFunction : public matlab::mex::Function {
 public:
-    void operator()(ArgumentList outputs, ArgumentList inputs) {
+    void operator()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
+        
+        
+        
+        
+        
+        // specify inputs
+        int       m = inputs[0];
+        int    dims = inputs[1];
+        int   maskI = inputs[2];
+        int  indexp = inputs[3];
+        int    ordp = inputs[4];
+        int   rankp = inputs[5];
+        double conn = inputs[6];
+        double    p = inputs[7];  //std::vector<double> p_vec(p, p + sizeof(p)/sizeof(p[0]));
         
         
         
@@ -25,92 +39,41 @@ public:
         
         
         
-        // sort input p-values in ascending order
-        ordp  <- order(p)
-        ordp  <- as.integer(ordp)   // sorted orders (starts from 1)
-        // find the sorting ranks for unsorted p-values
-        rankp <- integer(m)
-        rankp[ordp] <- 1:m
-        rankp <- as.integer(rankp)  // sorting ranks (starts from 1)
+        // h & simes(h)
+        int         halpha = findHalpha(jumpalpha, alpha, m);
+        double simeshalpha = simesfactor[halpha+1];
         
+        // find the adjacency list
+        std::vector<std::vector<int>> adj = findAdjList(maskI, as.integer(indexp-1), dims, m, conn);
         
-        //
-        halpha      <- hommel:::findHalpha(hom@jumpalpha, level, m)
-        simeshalpha <- hom@simesfactor[halpha+1]
+        // find all STCs
+        auto reslist = findClusters(m, adj, ordp, rankp);
+        // auto [CHILD, ROOT, SIZE] = findClusters(m, adj, ordp, rankp);
         
+        // estimate TDP bounds
+        std::vector<double> tdps = forestTDP(m, halpha, level, simeshalpha, p, ordp, reslist.SIZE, reslist.ROOT, reslist.CHILD);
         
-        reslist <- findClusters(m, adj, ordp, rankp)
-        tdps    <- forestTDP(m, halpha, level, simeshalpha, p, ordp, reslist$SIZE, reslist$ROOT, reslist$CHILD)
-        stcs    <- queryPreparation(m, reslist$ROOT, tdps, reslist$CHILD)
-        //
-        clusterlist  <- answerQuery(gamma, stcs, ordp, reslist$SIZE, marks, tdps, reslist$CHILD)
-
+        // make proper preparations
+        std::vector<int> stcs = queryPreparation(m, reslist.ROOT, tdps, reslist.CHILD);
         
+        // form maximal clusters based on a TDP threshold
+        std::list<std::vector<int>> clusterlist = answerQuery(gamma, stcs, ordp, reslist.SIZE, marks, tdps, reslist.CHILD);
         
-        
-        
-        checkArguments(outputs, inputs);
-        const double offSet = inputs[0][0];
-        TypedArray<double> doubleArray = std::move(inputs[1]);
-        for (auto& elem : doubleArray) {
-            elem += offSet;
+        // return outputs (maximal clusters): #{outputs} = #{clusters}
+        int i = 0;
+        for(std::list<std::vector<int>>::iterator it = clusterlist.begin(); it != clusterlist.end(); ++it)
+        {
+            for(int j = 0; j < (*it).size(); j++)
+            {
+                outputs[i][j] = (*it)[j];
+            }
+            i++;
         }
-        outputs[0] = doubleArray;
         
         
         
     }
 
-    
-    void checkArguments(ArgumentList outputs, ArgumentList inputs)
-    {
-        // Get pointer to engine
-        std::shared_ptr<matlab::engine::MATLABEngine> matlabPtr = getEngine();
-
-        // Get array factory
-        ArrayFactory factory;
-
-        // Check offset argument: First input must be scalar double
-        if (inputs[0].getType() != ArrayType::DOUBLE ||
-            inputs[0].getType() == ArrayType::COMPLEX_DOUBLE ||
-            inputs[0].getNumberOfElements() != 1)
-        {
-            matlabPtr->feval(u"error",
-                0,
-                std::vector<Array>({ factory.createScalar("First input must be scalar double") }));
-        }
-
-        // Check array argument: Second input must be double array
-        if (inputs[1].getType() != ArrayType::DOUBLE ||
-            inputs[1].getType() == ArrayType::COMPLEX_DOUBLE)
-        {
-            matlabPtr->feval(u"error",
-                0,
-                std::vector<Array>({ factory.createScalar("Input must be double array") }));
-        }
-        // Check number of outputs
-        if (outputs.size() > 1) {
-            matlabPtr->feval(u"error",
-                0,
-                std::vector<Array>({ factory.createScalar("Only one output is returned") }));
-        }
-    }
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     
     //------------------------- (1) FIND ALL STCS (USING SORTING RANKS) -------------------------//
 
@@ -119,11 +82,11 @@ public:
     // augmented to keep track of the forest root of each component. UnionBySize(i,j) merges
     // the sets S_i and S_j (where S_k denotes the set containing k), and assigns the forestroot
     // of S_i to be the forestroot of the resulting union.
-    void UnionBySize(int                  i,
-                     int                  j,
-                     std::vector<int>&    PARENT,
-                     std::vector<int>&    FORESTROOT,
-                     std::vector<int>&    SIZE)
+    void UnionBySize(int               i,
+                     int               j,
+                     std::vector<int>& PARENT,
+                     std::vector<int>& FORESTROOT,
+                     std::vector<int>& SIZE)
     {
         int irep = Find(i, PARENT);
         int jrep = Find(j, PARENT);
@@ -145,16 +108,23 @@ public:
         }
         SIZE[iroot] += SIZE[jroot];
     }
-
+    
     // Compute all supra-threshold clusters (STCs)
-    std::vector<std::vector<int>> findClusters(int                             m,     // number of nodes
-                                               std::vector<std::vector<int>>&  ADJ,   // a list of neighbours for all nodes (unsorted!)
-                                               std::vector<int>&               ORD,   // sorted orders for non-decreasing p-values
-                                               std::vector<int>&               RANK)  // sorting ranks for all p-values
+    struct clusters
+    {
+        std::list<std::vector<int>> CHILD;
+        std::vector<int> ROOT;
+        std::vector<int> SIZE;
+    };
+    
+    auto findClusters(int                            m,     // number of nodes
+                      std::vector<std::vector<int>>& ADJ,   // a list of neighbours for all nodes (unsorted!)
+                      std::vector<int>&              ORD,   // sorted orders for non-decreasing p-values
+                      std::vector<int>&              RANK)  // sorting ranks for all p-values
     {
         // initialize output (1): a list of children for all nodes
         std::list<std::vector<int>> CHILD(m);
-        // initialize output (2): a vector of sizes of subtrees
+        // initialize output (2): a list of sizes of subtrees
         std::vector<int> SIZE(m, 1);
         // initialize output (3): a list of forest roots
         std::list<int> ROOT;
@@ -190,7 +160,7 @@ public:
                 if (RANK[IDS[j]-1] < i+1)  // check if the neighbour has a smaller rank
                 {
                     int jrep = Find(IDS[j]-1, PARENT);  // representative of the tree
-                    int    w = FORESTROOT[jrep];              // forest root of the tree
+                    int    w = FORESTROOT[jrep];        // forest root of the tree
                     
                     if (v != w)
                     {
@@ -226,10 +196,8 @@ public:
                 ROOT.push_back(FORESTROOT[i]);
             }
         }
-
-        return Rcpp::List::create(Rcpp::Named("CHILD") = CHILD,
-                                  Rcpp::Named("ROOT") = std::vector<int>(ROOT.begin(), ROOT.end()),
-                                  Rcpp::Named("SIZE") = SIZE);
+        
+        return clusters{ CHILD, std::vector<int>(ROOT.begin(), ROOT.end()), SIZE };
     }
 
 
@@ -240,9 +208,9 @@ public:
     // then all its children in reverse order on the stack. If we pop a value, it means that
     // all its children have been fully explored and added to the descendants, so we append
     // the current value to the descendants too.
-    std::vector<int> descendants(int                 v,      // node v (0:m-1)
-                                 std::vector<int>&   SIZE,   // subtree sizes for all nodes
-                                 Rcpp::List&         CHILD)  // a list of children for all nodes
+    std::vector<int> descendants(int                          v,      // node v (0:m-1)
+                                 std::vector<int>&            SIZE,   // subtree sizes for all nodes
+                                 std::list<std::vector<int>>& CHILD)  // a list of children for all nodes
     {
         std::vector<int> DESC(SIZE[v], 0);
         
@@ -265,8 +233,7 @@ public:
                 DESC[top] = ~v;  // push v as a value
                 
                 // push all children in reverse order
-                std::vector<int> CHD = Rcpp::as<Rcpp::IntegerVector>(CHILD[v]);  // convert the component of Rcpp::List input to its C++ equivalent with Rcpp::as(), which can be achieved through an implicit call to Rcpp::as() using the code below.
-                // Rcpp::IntegerVector CHD = CHILD[v];
+                std::vector<int> CHD = *(CHILD.begin()+v);
                 for (int j = CHD.size() - 1; j >= 0; j--)
                 {
                     top--;
@@ -279,16 +246,16 @@ public:
     }
 
     // Compute the TDP bounds of the heavy path starting at v
-    void heavyPathTDP(int                  v,       // start of the heavy path (0:m-1)
-                      int                  par,     // parent of v (-1 indicates no parent)
-                      int                  m,       // number of all nodes
-                      int                  h,       // h(alpha)
-                      double               alpha,   // alpha
-                      double               simesh,  // simesfactor at h(alpha)
-                      std::vector<double>& P,       // all p-values (unsorted!)
-                      std::vector<int>&    SIZE,    // subtree sizes for all nodes
-                      Rcpp::List&          CHILD,   // a list of children for all nodes
-                      std::vector<double>& TDP)     // TDP bounds
+    void heavyPathTDP(int                          v,       // start of the heavy path (0:m-1)
+                      int                          par,     // parent of v (-1 indicates no parent)
+                      int                          m,       // number of all nodes
+                      int                          h,       // h(alpha)
+                      double                       alpha,   // alpha
+                      double                       simesh,  // simesfactor at h(alpha)
+                      std::vector<double>&         P,       // all p-values (unsorted!)
+                      std::vector<int>&            SIZE,    // subtree sizes for all nodes
+                      std::list<std::vector<int>>& CHILD,   // a list of children for all nodes
+                      std::vector<double>&         TDP)     // TDP bounds
     {
         // Rcpp::IntegerVector HP = descendants(v, SIZE, CHILD);
         // for (int i = 0; i < HP.size(); i++)
@@ -315,7 +282,7 @@ public:
             
             // update v & its parent
             par = v;
-            std::vector<int> CHD = CHILD[v];
+            std::vector<int> CHD = *(CHILD.begin()+v);
             v = CHD[0];
         }
     }
@@ -323,14 +290,14 @@ public:
     // Find the start of every heavy path & compute the TDPs of that heavy path
     // start of heavy path: 1) root of F;
     //                      2) non-root node that is not the 1st heavy child
-    std::vector<double> forestTDP(int                  m,       // number of all nodes
-                                  int                  h,       // h(alpha)
-                                  double               alpha,   // alpha
-                                  double               simesh,  // simesfactor at h(alpha)
-                                  std::vector<double>& P,       // all p-values (unsorted!)
-                                  std::vector<int>&    SIZE,    // subtree size for all nodes
-                                  std::vector<int>&    ROOT,    // all roots of the forest
-                                  Rcpp::List&          CHILD)   // a child list for all nodes
+    std::vector<double> forestTDP(int                          m,       // number of all nodes
+                                  int                          h,       // h(alpha)
+                                  double                       alpha,   // alpha
+                                  double                       simesh,  // simesfactor at h(alpha)
+                                  std::vector<double>&         P,       // all p-values (unsorted!)
+                                  std::vector<int>&            SIZE,    // subtree size for all nodes
+                                  std::vector<int>&            ROOT,    // all roots of the forest
+                                  std::list<std::vector<int>>& CHILD)   // a child list for all nodes
     {
         std::vector<double> TDP(m);
         
@@ -342,7 +309,7 @@ public:
         // loop through all nodes
         for (int i = 0; i < m; i++)
         {
-            std::vector<int> CHD = CHILD[i];
+            std::vector<int> CHD = *(CHILD.begin()+i);
             for (int j = 1; j < CHD.size(); j++)
             {
                 heavyPathTDP(CHD[j], i, m, h, alpha, simesh, P, SIZE, CHILD, TDP);
@@ -364,10 +331,10 @@ public:
     };
 
     // Set up ADMSTC: a list of representative of admissible STCs
-    std::vector<int> queryPreparation(int                  m,      // number of vertices
-                                      std::vector<int>&    ROOT,   // all roots of the forest
-                                      std::vector<double>& TDP,    // all TDP bounds
-                                      Rcpp::List&          CHILD)  // a children list for all vertices
+    std::vector<int> queryPreparation(int                          m,      // number of vertices
+                                      std::vector<int>&            ROOT,   // all roots of the forest
+                                      std::vector<double>&         TDP,    // all TDP bounds
+                                      std::list<std::vector<int>>& CHILD)  // a children list for all vertices
     {
         std::vector<int> ADMSTC;  // a vector of representatives of admissible STCs
         ADMSTC.reserve(m);
@@ -389,7 +356,7 @@ public:
                 // check if v has higher TDP than its ancestors
                 if (TDP[v] > q) ADMSTC.push_back(v);  // note: q>=-1 & invalid STCs have TDP=-1
                 
-                std::vector<int> CHD = CHILD[v];
+                std::vector<int> CHD = *(CHILD.begin()+v);
                 for (int j = 0; j < CHD.size(); j++)
                 {
                     STACK.push_back(CHD[j]);
@@ -397,9 +364,6 @@ public:
                 }
             }
         }
-        
-        // // use a lambda function for the sorting step (To compile, require C++11 and use the command: g++ –std=c++11 ARIBrain.cpp; to construct R package, add the following to the DESCRIPTIONS file to enable C++11: SystemRequirements: C++11)
-        // std::sort(ADMSTC.begin(), ADMSTC.end(), [&TDP](int v, int w) {return TDP[v] < TDP[w];});
         
         // sort ADMSTC in ascending order of TDP using the comparator
         std::sort(ADMSTC.begin(), ADMSTC.end(), compareBy(TDP));
@@ -443,12 +407,12 @@ public:
 
     // Answer the query, i.e., find maximal STCs under the TDP condition.
     // gamma>=0 is needed because inadmissible STCs have been assigned TDP -1.
-    Rcpp::List answerQuery(double               gamma,
-                           std::vector<int>&    ADMSTC,
-                           std::vector<int>&    SIZE,
-                           std::vector<int>&    MARK,
-                           std::vector<double>& TDP,
-                           Rcpp::List&          CHILD)
+    std::list<std::vector<int>> answerQuery(double                       gamma,
+                                            std::vector<int>&            ADMSTC,
+                                            std::vector<int>&            SIZE,
+                                            std::vector<int>&            MARK,
+                                            std::vector<double>&         TDP,
+                                            std::list<std::vector<int>>& CHILD)
     {
         if (gamma < 0) gamma = 0;  // constrain TDP threshold gamma to be non-negative
         
@@ -481,13 +445,13 @@ public:
             }
         }
         
-        return Rcpp::wrap(ANS);
+        return ANS;
     }
 
     // Counting sort in descending order of cluster sizes.
-    std::vector<int> counting_sort(int                  n,          // #{clusters}
-                                   int                  maxid,      // max(cluster size)
-                                   std::vector<int>&    CLSTRSIZE)  // unsorted cluster sizes
+    std::vector<int> counting_sort(int               n,          // #{clusters}
+                                   int               maxid,      // max(cluster size)
+                                   std::vector<int>& CLSTRSIZE)  // unsorted cluster sizes
     {
         // initialise output sorted indices for descending cluster sizes
         std::vector<int> SORTED(n, 0);
@@ -513,15 +477,6 @@ public:
         
         return SORTED;
     }
-    
-    
-    
-    
-    
-    
-    
-    
-    
     
     
 };
