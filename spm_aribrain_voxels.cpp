@@ -1,5 +1,7 @@
 #include "mex.hpp"
 #include "mexAdapter.hpp"
+#include "spm_aribrain.h"
+
 #include <iostream>
 #include <vector>
 #include <list>
@@ -31,16 +33,16 @@ std::vector<int> index2xyz(int               index,
 }
 
 // Convert several voxel indices to an xyz-coordinate matrix
-Rcpp::IntegerMatrix ids2xyz(std::vector<int>& IDS,
-                            std::vector<int>& DIMS)
+int ids2xyz(std::vector<int>& IDS,
+            std::vector<int>& DIMS)
 {
-    Rcpp::IntegerMatrix XYZS(IDS.size(), 3);
+    int XYZS[IDS.size()][3];
     for (int i = 0; i < IDS.size(); i++)
     {
         std::vector<int> XYZ = index2xyz(IDS[i], DIMS);
-        XYZS(i,0) = XYZ[0];
-        XYZS(i,1) = XYZ[1];
-        XYZS(i,2) = XYZ[2];
+        XYZS[i][0] = XYZ[0];
+        XYZS[i][1] = XYZ[1];
+        XYZS[i][2] = XYZ[2];
     }
 
     return XYZS;
