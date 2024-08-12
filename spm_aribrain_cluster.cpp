@@ -17,29 +17,23 @@ public:
         
         
         // specify inputs
-        int       m = inputs[0];
-        int    dims = inputs[1];
-        int   maskI = inputs[2];
-        int  indexp = inputs[3];
-        int    ordp = inputs[4];
-        int   rankp = inputs[5];
-        double conn = inputs[6];
-        double    p = inputs[7];
-        bool  simes = inputs[8];
+        int        m = inputs[0];
+        int     ordp = inputs[1];
+        int    rankp = inputs[2];
+        double alpha = inputs[3];
+        double     p = inputs[4]; ??or sortp
+        bool   simes = inputs[5];
         
         
         sortp <- p[ordp]
         
         
-        simesfactor <- findsimesfactor(simes, m)
-        
-        jumpalpha <- findalpha(sortp, m, simesfactor, simes)
-        
-        h <- findHalpha(hommel@jumpalpha, alpha, m)
+        std::vector<double> simesfactor = findsimesfactor(simes, m);
+        std::vector<double> jumpalpha = findalpha(sortp, m, simesfactor, simes); 
+        int h = findHalpha(jumpalpha, alpha, m);
+        double simesfactor = simesfactor[h];
 
-        simesfactor <- hommel@simesfactor[h+1]
-
-        allsortedp <- hommel@p[hommel@sorter]
+        allsortedp <- p[hommel@sorter]
         
         ix_sortedp <- integer(m)
         names(ix_sortedp) <- names(hommel@p)
