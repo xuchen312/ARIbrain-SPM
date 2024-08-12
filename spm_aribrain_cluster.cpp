@@ -2,45 +2,60 @@
  * c = spm_aribrain_cluster(a,b);
  * Compute the TDP lower bounds for supra-threshold clusters using ARI.
 */
+
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 #include "spm_aribrain.h"
-#include <vector>
 
-using namespace matlab::data;
-using matlab::mex::ArgumentList;
+#include <vector>
 
 class MexFunction : public matlab::mex::Function {
 public:
-    void spm_aribrain_cluster()(ArgumentList outputs, ArgumentList inputs) {
+    void spm_aribrain_cluster()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
         
         
         
         
+        // specify inputs
+        int       m = inputs[0];
+        int    dims = inputs[1];
+        int   maskI = inputs[2];
+        int  indexp = inputs[3];
+        int    ordp = inputs[4];
+        int   rankp = inputs[5];
+        double conn = inputs[6];
+        double    p = inputs[7];
+        bool  simes = inputs[8];
         
         
+        sortp <- p[ordp]
         
         
+        simesfactor <- findsimesfactor(simes, m)
         
-        // h(alpha)
-        halpha      = findHalpha(jumpalpha, level, m);
-        simeshalpha = simesfactor[halpha+1];
+        jumpalpha <- findalpha(sortp, m, simesfactor, simes)
         
-        //
-        reslist = findClusters(m, adj, ordp, rankp);
-        tdps    = forestTDP(m, halpha, level, simeshalpha, p, ordp, reslist$SIZE, reslist$ROOT, reslist$CHILD);
-        stcs    = queryPreparation(m, reslist$ROOT, tdps, reslist$CHILD);
-        
-        //
-        clusterlist = answerQuery(gamma, stcs, ordp, reslist$SIZE, marks, tdps, reslist$CHILD);
+        h <- findHalpha(hommel@jumpalpha, alpha, m)
 
+        simesfactor <- hommel@simesfactor[h+1]
+
+        allsortedp <- hommel@p[hommel@sorter]
+        
+        ix_sortedp <- integer(m)
+        names(ix_sortedp) <- names(hommel@p)
+        ix_sortedp[hommel@sorter] <- 1:m
+        ix_sortedp <- ix_sortedp[ix]
+
+        discoveries <- findDiscoveries(ix_sortedp, allsortedp, simesfactor, h, alpha, k, m)
+        
+        
         
         
         
         
         checkArguments(outputs, inputs);
         const double offSet = inputs[0][0];
-        TypedArray<double> doubleArray = std::move(inputs[1]);
+        matlab::data::TypedArray<double> doubleArray = std::move(inputs[1]);
         for (auto& elem : doubleArray) {
             elem += offSet;
         }
@@ -51,7 +66,7 @@ public:
     }
 
     
-    void checkArguments(ArgumentList outputs, ArgumentList inputs)
+    void checkArguments(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs)
     {
         // Get pointer to engine
         std::shared_ptr<matlab::engine::MATLABEngine> matlabPtr = getEngine();
@@ -98,8 +113,8 @@ public:
     
     
     // Implementation of Fortune 1989
-    std::vector<int> findhull(int                 m,                // length of p
-                              std::vector<double> &p)               // p-values (sorted!)
+    std::vector<int> findhull(int                 m,   // length of p
+                              std::vector<double> &p)  // p-values (sorted!)
     {
       // intialize output length
       int r;
@@ -396,6 +411,7 @@ public:
       
       return discoveries;
     }
+    
     
     
     
