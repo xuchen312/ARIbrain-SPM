@@ -1,26 +1,22 @@
-#include "mex.hpp"
-#include "mexAdapter.hpp"
-#include "spm_aribrain.h"
-
-#include <iostream>
+#include "MatlabDataArray.hpp"
 #include <vector>
-#include <list>
-#include <algorithm>
-#include <iterator>
-#include <cmath>
 
+#include "spm_aribrain_tdp.h"
 
-//------------------------- (0) PREPARATIONS FOR 3D INPUTS -------------------------//
+//------------------------- PREPARATIONS FOR 3D INPUTS -------------------------//
 
-// Macros:
-// 1) Convert xyz coordinates to index
-#define xyz2index(x, y, z, DIMS) ( (z-1)*DIMS[0]*DIMS[1] + (y-1)*DIMS[0] + (x-1) )
-// 2) Compute size of 3D image
-#define ndims(DIMS) ( DIMS[0]*DIMS[1]*DIMS[2] )
+// Convert xyz coordinates to 3D voxel index (starts from 0)
+int xyz2index(int                                x,
+              int                                y,
+              int                                z,
+              matlab::data::TypedArray<int32_t>& DIMS)  // 3D image dimensions
+{
+    return ( (z-1)*DIMS[0]*DIMS[1] + (y-1)*DIMS[0] + (x-1) );
+}
 
-// Convert voxel index to [x y z] coordinates
-std::vector<int> index2xyz(int               index,
-                           std::vector<int>& DIMS)
+// Convert 3D voxel index to [x y z] coordinates
+std::vector<int> index2xyz(int                                index,  // 3D voxel index (starts from 0)
+                           matlab::data::TypedArray<int32_t>& DIMS)   // 3D image dimensions
 {
     std::vector<int> XYZ(3);
     XYZ[0] = index % DIMS[0] + 1;
@@ -32,29 +28,13 @@ std::vector<int> index2xyz(int               index,
     return XYZ;
 }
 
-// Convert several voxel indices to an xyz-coordinate matrix
-int ids2xyz(std::vector<int>& IDS,
-            std::vector<int>& DIMS)
-{
-    int XYZS[IDS.size()][3];
-    for (int i = 0; i < IDS.size(); i++)
-    {
-        std::vector<int> XYZ = index2xyz(IDS[i], DIMS);
-        XYZS[i][0] = XYZ[0];
-        XYZS[i][1] = XYZ[1];
-        XYZS[i][2] = XYZ[2];
-    }
-
-    return XYZS;
-}
-
 // Check if a voxel is in the mask
-bool xyz_check(int               x,
-               int               y,
-               int               z,
-               int               index,
-               std::vector<int>& DIMS,
-               std::vector<int>& MASK)
+bool xyz_check(int                                x,
+               int                                y,
+               int                                z,
+               int                                index,  // 3D voxel index (starts from 0)
+               matlab::data::TypedArray<int32_t>& DIMS,   // 3D image dimensions
+               matlab::data::TypedArray<int32_t>& MASK)   // 3D mask (non-zero for in-mask voxels)
 {
     return (x >= 1 && x <= DIMS[0] && \
             y >= 1 && y <= DIMS[1] && \
@@ -63,10 +43,10 @@ bool xyz_check(int               x,
 }
 
 // Find valid neighbours of a voxel
-std::vector<int> findNeighbours(std::vector<int>& MASK,   // 3D mask of original orders (1:m)
-                                std::vector<int>& DIMS,   // image dimensions
-                                int               index,  // voxel index of interest
-                                int               conn)   // connectivity criterion
+std::vector<int> findNeighbours(matlab::data::TypedArray<int32_t>& MASK,   // 3D mask of original orders (1:m)
+                                matlab::data::TypedArray<int32_t>& DIMS,   // image dimensions
+                                int                                index,  // 3D voxel index (starts from 0)
+                                int                                conn)   // connectivity criterion
 {
     // compute [x y z] coordinates based on voxel index
     std::vector<int> XYZ = index2xyz(index, DIMS);
@@ -85,7 +65,7 @@ std::vector<int> findNeighbours(std::vector<int>& MASK,   // 3D mask of original
         bool inmask = xyz_check(XYZ[0]+DX[i], XYZ[1]+DY[i], XYZ[2]+DZ[i], id, DIMS, MASK);
         if (inmask)
         {
-            IDS.push_back(MASK[id]);
+            IDS.push_back(MASK[id]);  // append original/unsorted orders (1:m)
         }
     }
     
@@ -93,17 +73,17 @@ std::vector<int> findNeighbours(std::vector<int>& MASK,   // 3D mask of original
 }
 
 // Find the adjacency list for all in-mask voxels
-std::vector<std::vector<int>> findAdjList(std::vector<int>& MASK,    // 3D mask of original orders (1:m)
-                                          std::vector<int>& INDEXP,  // voxel indices of unsorted p-values
-                                          std::vector<int>& DIMS,    // image dimensions
-                                          int               m,       // number of in-mask voxels
-                                          int               conn)    // connectivity criterion
+std::vector<std::vector<int>> findAdjList(matlab::data::TypedArray<int32_t>& MASK,    // 3D mask of original orders (1:m)
+                                          matlab::data::TypedArray<int32_t>& INDEXP,  // in-mask voxel indices in 3D space (starts from 1)
+                                          matlab::data::TypedArray<int32_t>& DIMS,    // image dimensions
+                                          int                                m,       // number of in-mask voxels
+                                          int                                conn)    // connectivity criterion
 {
     std::vector<std::vector<int>> ADJ;
     ADJ.reserve(m*conn);
     for (int i = 0; i < m; i++)
     {
-        std::vector<int> IDS = findNeighbours(MASK, DIMS, INDEXP[i], conn);
+        std::vector<int> IDS = findNeighbours(MASK, DIMS, INDEXP[i]-1, conn);
         ADJ.push_back(IDS);
     }
     
