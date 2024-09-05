@@ -1,81 +1,86 @@
-/* 
- * spm_aribrain_tdp
- * clusterlist = spm_aribrain_tdp(m,dims,maskI,indexp,ordp,rankp,conn,p);
- * Compute maximal clusters using adaptive thresholding algorithm.
+/*
+ * spm_aribrain_tdp.cpp - Compute maximal clusters using adaptive thresholding algorithm.
+ *
+ * The calling syntax is:
+ *
+ *   [nclus,ixclus] = spm_aribrain_tdp(m,conn,alpha,gamma,simes,dims,maskI,indexp,ordp,rankp,allp,sortp);
+ *
+ * This is a MEX file for MATLAB.
 */
 
 #include "mex.hpp"
 #include "mexAdapter.hpp"
-#include "spm_aribrain.h"
-
 #include <iostream>
 #include <vector>
 #include <list>
 #include <algorithm>
 #include <iterator>
 #include <cmath>
+#include <tuple>
+
+#include "spm_aribrain_tdp.h"
+#include "spm_aribrain_cluster.h"
 
 class MexFunction : public matlab::mex::Function {
+    
+    matlab::data::ArrayFactory factory;
+    
 public:
+    
+    //-------------------------- (1) MAIN MEX FUNCTION --------------------------//
+    
     void operator()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
         
-        
-        
-        
-        
         // specify inputs
-        int       m = inputs[0];
-        int    dims = inputs[1];
-        int   maskI = inputs[2];
-        int  indexp = inputs[3];
-        int    ordp = inputs[4];
-        int   rankp = inputs[5];
-        double conn = inputs[6];
-        double    p = inputs[7];  //std::vector<double> p_vec(p, p + sizeof(p)/sizeof(p[0]));
+        int        m = inputs[0][0];  // number of all p-values
+        int     conn = inputs[1][0];  // connectivity criterion
+        double alpha = inputs[2][0];  // significance level
+        double gamma = inputs[3][0];  // TDP threshold
+        bool   simes = inputs[4][0];  // (TRUE): Simes' test or (FALSE): Hommel's robust test
+        matlab::data::TypedArray<int32_t>   dims = std::move(inputs[5]);   // image dimensions
+        matlab::data::TypedArray<int32_t>  maskI = std::move(inputs[6]);   // 3D mask of original orders (1:m)
+        matlab::data::TypedArray<int32_t> indexp = std::move(inputs[7]);   // in-mask voxel indices in 3D space (starts from 1)
+        matlab::data::TypedArray<int32_t>   ordp = std::move(inputs[8]);   // sorted orders (1:m)
+        matlab::data::TypedArray<int32_t>  rankp = std::move(inputs[9]);   // sorting ranks (1:m)
+        matlab::data::TypedArray<double>    allp = std::move(inputs[10]);  // all original/unsorted p-values
+        matlab::data::TypedArray<double>   sortp = std::move(inputs[11]);  // all sorted p-values
         
-        
-        
-        
-        
-        
-        
-        // h & simes(h)
-        int         halpha = findHalpha(jumpalpha, alpha, m);
-        double simeshalpha = simesfactor[halpha+1];
-        
+        // Compute h
+        std::vector<double>        simesfactors = findsimesfactor(simes, m);
+        std::vector<double>           jumpalpha = findalpha(sortp, m, simesfactors, simes);
+        int                                   h = findHalpha(jumpalpha, alpha, m);
+        int                                   z = findConcentration(sortp, simesfactors[h], h, alpha, m);
         // find the adjacency list
-        std::vector<std::vector<int>> adj = findAdjList(maskI, as.integer(indexp-1), dims, m, conn);
-        
+        std::vector<std::vector<int>>       adj = findAdjList(maskI, indexp, dims, m, conn);
         // find all STCs
-        auto reslist = findClusters(m, adj, ordp, rankp);
-        // auto [CHILD, ROOT, SIZE] = findClusters(m, adj, ordp, rankp);
-        
-        // estimate TDP bounds
-        std::vector<double> tdps = forestTDP(m, halpha, level, simeshalpha, p, ordp, reslist.SIZE, reslist.ROOT, reslist.CHILD);
-        
+        auto                                res = findClusters(m, adj, ordp, rankp);
+        //auto res = findClusters(m, adj, ordp, rankp);  // use struct to return multiple outputs
+        // estimate TDP bounds for all STCs
+        std::vector<double>                tdps = forestTDP(m, h, z, alpha, simesfactors[h], allp, std::get<2>(res), std::get<1>(res), std::get<0>(res));
         // make proper preparations
-        std::vector<int> stcs = queryPreparation(m, reslist.ROOT, tdps, reslist.CHILD);
-        
+        std::vector<int>                   stcs = queryPreparation(m, std::get<1>(res), tdps, std::get<0>(res));
         // form maximal clusters based on a TDP threshold
-        std::list<std::vector<int>> clusterlist = answerQuery(gamma, stcs, ordp, reslist.SIZE, marks, tdps, reslist.CHILD);
+        std::vector<int> marks(m, 0);
+        std::list<std::vector<int>> clusterlist = answerQuery(gamma, stcs, std::get<2>(res), marks, tdps, std::get<0>(res));
         
-        // return outputs (maximal clusters): #{outputs} = #{clusters}
-        int i = 0;
+        // return outputs (maximal clusters)
+        std::vector<int> nclus;
+        std::vector<int> ixclus;
+        nclus.reserve(clusterlist.size());
+        ixclus.reserve(m);
         for(std::list<std::vector<int>>::iterator it = clusterlist.begin(); it != clusterlist.end(); ++it)
         {
+            nclus.push_back((*it).size());
             for(int j = 0; j < (*it).size(); j++)
             {
-                outputs[i][j] = (*it)[j];
+                ixclus.push_back((*it)[j]);
             }
-            i++;
         }
-        
-        
-        
+        outputs[0] = factory.createArray({1, nclus.size()},  nclus.begin(),  nclus.end());  // cluster size
+        outputs[1] = factory.createArray({1,ixclus.size()}, ixclus.begin(), ixclus.end());  // voxel indices
     }
-
     
-    //------------------------- (1) FIND ALL STCS (USING SORTING RANKS) -------------------------//
+    //------------------------- (2) FIND ALL STCS (USING SORTING RANKS) -------------------------//
 
     // Union function of a disjoint-set data structure based on the "union by size" technique.
     // The disjoint sets will represent the components of a forest, and the data structure is
@@ -109,18 +114,18 @@ public:
         SIZE[iroot] += SIZE[jroot];
     }
     
-    // Compute all supra-threshold clusters (STCs)
-    struct clusters
-    {
-        std::list<std::vector<int>> CHILD;
-        std::vector<int> ROOT;
-        std::vector<int> SIZE;
-    };
+    //struct forests
+    //{
+    //    std::list<std::vector<int>> CHILD;
+    //    std::vector<int> ROOT;
+    //    std::vector<int> SIZE;
+    //};
     
-    auto findClusters(int                            m,     // number of nodes
-                      std::vector<std::vector<int>>& ADJ,   // a list of neighbours for all nodes (unsorted!)
-                      std::vector<int>&              ORD,   // sorted orders for non-decreasing p-values
-                      std::vector<int>&              RANK)  // sorting ranks for all p-values
+    // Compute all supra-threshold clusters (STCs)
+    std::tuple<std::list<std::vector<int>>, std::vector<int>, std::vector<int>> findClusters(int m,  // number of nodes
+                      std::vector<std::vector<int>>&     ADJ,   // a list of neighbours for all nodes (unsorted!)
+                      matlab::data::TypedArray<int32_t>& ORD,   // sorted orders for non-decreasing p-values
+                      matlab::data::TypedArray<int32_t>& RANK)  // sorting ranks for all p-values
     {
         // initialize output (1): a list of children for all nodes
         std::list<std::vector<int>> CHILD(m);
@@ -184,7 +189,12 @@ public:
             }
             
             // update child list
-            CHILD[v] = std::vector<int>(CHD.begin(), CHD.end());
+            std::list<std::vector<int>>::iterator it = CHILD.begin();
+            std::advance(it, v);
+            //(*it) = std::vector<int>(CHD.begin(), CHD.end());
+            std::move(CHD.begin(), CHD.end(), std::back_inserter(*it));
+            // or use std::move_iterator
+            
             CHD.resize(0);
         }
         
@@ -197,11 +207,11 @@ public:
             }
         }
         
-        return clusters{ CHILD, std::vector<int>(ROOT.begin(), ROOT.end()), SIZE };
+        //return forests{ CHILD, std::vector<int>(ROOT.begin(), ROOT.end()), SIZE };
+        return std::make_tuple( CHILD, std::vector<int>(ROOT.begin(), ROOT.end()), SIZE );
     }
-
-
-    //------------------------- (2) COMPUTE TDPS FOR ALL STCS -------------------------//
+    
+    //------------------------- (3) COMPUTE TDPS FOR ALL STCS -------------------------//
 
     // Iterative post-order traversal to find descendants of v (including v).
     // Note: When we pop a vertex from the stack, we push that vertex again as a value and
@@ -233,7 +243,9 @@ public:
                 DESC[top] = ~v;  // push v as a value
                 
                 // push all children in reverse order
-                std::vector<int> CHD = *(CHILD.begin()+v);
+                std::list<std::vector<int>>::iterator it = CHILD.begin();
+                std::advance(it, v);
+                std::vector<int> CHD = (*it);
                 for (int j = CHD.size() - 1; j >= 0; j--)
                 {
                     top--;
@@ -246,24 +258,25 @@ public:
     }
 
     // Compute the TDP bounds of the heavy path starting at v
-    void heavyPathTDP(int                          v,       // start of the heavy path (0:m-1)
-                      int                          par,     // parent of v (-1 indicates no parent)
-                      int                          m,       // number of all nodes
-                      int                          h,       // h(alpha)
-                      double                       alpha,   // alpha
-                      double                       simesh,  // simesfactor at h(alpha)
-                      std::vector<double>&         P,       // all p-values (unsorted!)
-                      std::vector<int>&            SIZE,    // subtree sizes for all nodes
-                      std::list<std::vector<int>>& CHILD,   // a list of children for all nodes
-                      std::vector<double>&         TDP)     // TDP bounds
+    void heavyPathTDP(int                               v,       // start of the heavy path (0:m-1)
+                      int                               par,     // parent of v (-1 indicates no parent)
+                      int                               m,       // number of all nodes
+                      int                               h,       // h(alpha)
+                      int                               z,       // size of the concentration set
+                      double                            alpha,   // alpha
+                      double                            simesh,  // simesfactor at h(alpha)
+                      matlab::data::TypedArray<double>& P,       // all p-values (unsorted!)
+                      std::vector<int>&                 SIZE,    // subtree sizes for all nodes
+                      std::list<std::vector<int>>&      CHILD,   // a list of children for all nodes
+                      std::vector<double>&              TDP)     // TDP bounds
     {
-        // Rcpp::IntegerVector HP = descendants(v, SIZE, CHILD);
-        // for (int i = 0; i < HP.size(); i++)
-        // {
-        //     HP[i]++;
-        // }
-        std::vector<int> HP = descendants(v, SIZE, CHILD) + 1;
-        std::vector<int> NUM = findDiscoveries(HP, P, simesh, h, alpha, HP.size(), m);
+        std::vector<int> HP = descendants(v, SIZE, CHILD);
+        for (int i = 0; i < HP.size(); i++)
+        {
+            HP[i]++;
+        }
+        matlab::data::TypedArray<int32_t> IXP = factory.createArray({1, HP.size()}, HP.begin(), HP.end());
+        std::vector<int> NUM = findDiscoveries(IXP, P, simesh, h, z, alpha, HP.size(), m);
         
         while (true)  // walk down the heavy path
         {
@@ -282,7 +295,9 @@ public:
             
             // update v & its parent
             par = v;
-            std::vector<int> CHD = *(CHILD.begin()+v);
+            std::list<std::vector<int>>::iterator it = CHILD.begin();
+            std::advance(it, v);
+            std::vector<int> CHD = (*it);
             v = CHD[0];
         }
     }
@@ -290,37 +305,39 @@ public:
     // Find the start of every heavy path & compute the TDPs of that heavy path
     // start of heavy path: 1) root of F;
     //                      2) non-root node that is not the 1st heavy child
-    std::vector<double> forestTDP(int                          m,       // number of all nodes
-                                  int                          h,       // h(alpha)
-                                  double                       alpha,   // alpha
-                                  double                       simesh,  // simesfactor at h(alpha)
-                                  std::vector<double>&         P,       // all p-values (unsorted!)
-                                  std::vector<int>&            SIZE,    // subtree size for all nodes
-                                  std::vector<int>&            ROOT,    // all roots of the forest
-                                  std::list<std::vector<int>>& CHILD)   // a child list for all nodes
+    std::vector<double> forestTDP(int                               m,       // number of all nodes
+                                  int                               h,       // h(alpha)
+                                  int                               z,       // size of the concentration set
+                                  double                            alpha,   // significance level
+                                  double                            simesh,  // simesfactor at h(alpha)
+                                  matlab::data::TypedArray<double>& P,       // all p-values (unsorted!)
+                                  std::vector<int>&                 SIZE,    // subtree size for all nodes
+                                  std::vector<int>&                 ROOT,    // all roots of the forest
+                                  std::list<std::vector<int>>&      CHILD)   // a child list for all nodes
     {
         std::vector<double> TDP(m);
         
         // loop through all roots
         for (int i = 0; i < ROOT.size(); i++)
         {
-            heavyPathTDP(ROOT[i], -1, m, h, alpha, simesh, P, SIZE, CHILD, TDP);
+            heavyPathTDP(ROOT[i], -1, m, h, z, alpha, simesh, P, SIZE, CHILD, TDP);
         }
         // loop through all nodes
         for (int i = 0; i < m; i++)
         {
-            std::vector<int> CHD = *(CHILD.begin()+i);
+            std::list<std::vector<int>>::iterator it = CHILD.begin();
+            std::advance(it, i);
+            std::vector<int> CHD = (*it);
             for (int j = 1; j < CHD.size(); j++)
             {
-                heavyPathTDP(CHD[j], i, m, h, alpha, simesh, P, SIZE, CHILD, TDP);
+                heavyPathTDP(CHD[j], i, m, h, z, alpha, simesh, P, SIZE, CHILD, TDP);
             }
         }
 
         return TDP;
     }
-
-
-    //------------------------- (3) PREPARE ADMISSIBLE STCS -------------------------//
+    
+    //------------------------- (4) PREPARE ADMISSIBLE STCS -------------------------//
 
     // construct a comparator for the below sorting step
     struct compareBy
@@ -356,7 +373,9 @@ public:
                 // check if v has higher TDP than its ancestors
                 if (TDP[v] > q) ADMSTC.push_back(v);  // note: q>=-1 & invalid STCs have TDP=-1
                 
-                std::vector<int> CHD = *(CHILD.begin()+v);
+                std::list<std::vector<int>>::iterator it = CHILD.begin();
+                std::advance(it, v);
+                std::vector<int> CHD = (*it);
                 for (int j = 0; j < CHD.size(); j++)
                 {
                     STACK.push_back(CHD[j]);
@@ -370,9 +389,8 @@ public:
 
         return ADMSTC;
     }
-
-
-    //-------------------------- (4) FORM CLUSTERS USING gamma --------------------------//
+    
+    //-------------------------- (5) FORM CLUSTERS USING gamma --------------------------//
 
     // Find leftmost index i in ADMSTC such that TDP[ADMSTC[i]] >= g
     // return size(ADMSTC) if no such index exists;
@@ -447,36 +465,5 @@ public:
         
         return ANS;
     }
-
-    // Counting sort in descending order of cluster sizes.
-    std::vector<int> counting_sort(int               n,          // #{clusters}
-                                   int               maxid,      // max(cluster size)
-                                   std::vector<int>& CLSTRSIZE)  // unsorted cluster sizes
-    {
-        // initialise output sorted indices for descending cluster sizes
-        std::vector<int> SORTED(n, 0);
-        std::vector<int> COUNT(maxid+1, 0);
-        
-        // store count of each cluster size
-        for (int i = 0; i < n; i++)
-        {
-            COUNT[CLSTRSIZE[i]]++;
-        }
-        
-        // find cumulative frequency
-        for (int i = maxid; i > 0; i--)
-        {
-            COUNT[i-1] += COUNT[i];
-        }
-        
-        for (int i = 0; i < n; i++)
-        {
-            SORTED[COUNT[CLSTRSIZE[i]] - 1] = i;
-            COUNT[CLSTRSIZE[i]]--;
-        }
-        
-        return SORTED;
-    }
-    
     
 };
