@@ -4,8 +4,8 @@ function [nclus,Lclus,tdpclus] = spm_aribrain_tdpCluster(allp,sortp,ordp,rankp,m
 %
 % =========================================================================
 % SYNTAX: [nclus,Lclus,tdnclus] = spm_aribrain_tdpCluster(allp,sortp,ordp, ...
-%                                 rankp,mask,['alpha',alpha,'conn',conn, ...
-%                                 'simes',simes,'tdpth',tdpth])
+%                                 rankp,mask,['alpha',alpha,'simes',simes, ...
+%                                 'conn',conn,'tdpth',tdpth])
 % -------------------------------------------------------------------------
 % Inputs:
 %  -    allp: a vector of all valid p-values
@@ -15,13 +15,13 @@ function [nclus,Lclus,tdpclus] = spm_aribrain_tdpCluster(allp,sortp,ordp,rankp,m
 %  -    mask: a 3D array, where zero indicates unwanted voxels
 % Inputs (optional):
 %  -   alpha: a significance level (default: 0.05)
-%  -    conn: a connectivity criterion (default: 18)
 %  -   simes: a logical variable used to indicate Simes' (true, default) or 
 %             Hommel's (false) robust test is conducted
+%  -    conn: a connectivity criterion (default: 18)
 %  -   tdpth: a chosen TDP threshold (default: 0.7)
 %
 % Outputs:
-%  -   nclus: a vector of generated maximal cluster sizes
+%  -   nclus: a vector of sizes of generated maximal clusters
 %  -   Lclus: a 3D array of clusters, labelled with 1:#{clusters}
 %  - tdpclus: a vector of TDP lower bounds for all maximal clusters
 % =========================================================================
@@ -39,8 +39,8 @@ if nargout ~= 3; error('spm_aribrain_tdpCluster: there must be 3 outputs'); end
 
 % specify default optional input values
 alpha = 0.05;
-conn  = 18;
 simes = true;
+conn  = 18;
 tdpth = 0.7;
 
 % load optional input arguments
@@ -48,10 +48,10 @@ while ~isempty(varargin)
     switch lower(varargin{1})
         case 'alpha'
             alpha = varargin{2};
-        case 'conn'
-            conn = varargin{2};
         case 'simes'
             simes = varargin{2};
+        case 'conn'
+            conn = varargin{2};
         case 'tdpth'
             tdpth = varargin{2};
         otherwise
