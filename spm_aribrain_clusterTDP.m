@@ -1,6 +1,6 @@
 function [tdpclus] = spm_aribrain_clusterTDP(allp,sortp,ixp,varargin)
 %
-% Compute the ARI-based TDP lower bounds for supra-threshold clusters
+% Compute the ARI-based TDP lower bounds for any clusters
 %
 % =========================================================================
 % FORMAT: [tdpclus] = spm_aribrain_clusterTDP(allp,sortp,ixp,['alpha', ...
@@ -42,10 +42,10 @@ while ~isempty(varargin)
     switch lower(varargin{1})
         case 'alpha'
             alpha = varargin{2};
-        case 'conn'
-            warning('spm_aribrain_clusterTDP: ''conn'' not used');
         case 'simes'
             simes = varargin{2};
+        case 'conn'
+            warning('spm_aribrain_clusterTDP: ''conn'' not used');
         case 'tdp'
             warning('spm_aribrain_clusterTDP: ''tdp'' not used');
         otherwise
