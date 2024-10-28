@@ -193,7 +193,7 @@ The main **ARIbrain-SPM** results are summarised with a result table ```TabDat``
 
 ## References
 
-Rosenblatt, J.D., Finos, L., Weeda, W.D., Solari, A. and Goeman, J.J. (2018). All-Resolutions Inference for brain imaging. *Neuroimage*, 181:786-796. [[Paper](https://doi.org/10.1016/j.neuroimage.2018.07.060)]
+Rosenblatt, J.D., Finos, L., Weeda, W.D., Solari, A. and Goeman, J.J. (2018). All-Resolutions Inference for brain imaging. *NeuroImage*, 181:786-796. [[Paper](https://doi.org/10.1016/j.neuroimage.2018.07.060)]
 
 Chen, X., Goeman, J.J., Krebs, T.J.P., Meijer, R.J. and Weeda, W.D. (2023). Adaptive Cluster Thresholding with Spatial Activation Guarantees Using All-resolutions Inference. *arXiv*. [[Paper](https://arxiv.org/abs/2206.13587)]
 
