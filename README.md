@@ -67,7 +67,7 @@ Therefore, the ARI-based TDP inference could be separated into two parts:
   ```r
   spm_aribrain(['xSPM',xSPM,'alpha',alpha,'file',file,'simes',simes,'conn',conn,'tdpth',tdpth])
   ```
-  Here, at most 6 pairs of input arguments could be specified, where **clusterTDP** and **tdpCluster** require at most 8 and 12 inputs, respectively.
+  Here, at most 6 pairs of input arguments could be specified, where **clusterTDP** and **tdpCluster** require at most 8 and 12 inputs (i.e., 4 and 6 pairs), respectively.
 
   - Parameters for **clusterTDP** & **tdpCluster**
   
