@@ -226,7 +226,7 @@ case 'table'                                                        %-Table
 
 
 
-    %-Load contrast-related SPM & mask images
+    %-Load contrast-related SPM image & mask
     %----------------------------------------------------------------------
     if length(xSPM.Ic) > 1
         error('Please select a single contrast.');
@@ -272,14 +272,14 @@ case 'table'                                                        %-Table
         varargins{iv+1} = xSPM.alpha;
         iv = iv+2;
     end
-    if isfield(xSPM,'conn')
-        varargins{iv}   = 'conn';
-        varargins{iv+1} = xSPM.conn;
-        iv = iv+2;
-    end
     if isfield(xSPM,'simes')
         varargins{iv}   = 'simes';
         varargins{iv+1} = xSPM.simes;
+        iv = iv+2;
+    end
+    if isfield(xSPM,'conn')
+        varargins{iv}   = 'conn';
+        varargins{iv+1} = xSPM.conn;
         iv = iv+2;
     end
     if isfield(xSPM,'tdpth')
@@ -289,13 +289,13 @@ case 'table'                                                        %-Table
     end
     varargins(iv:end) = [];
 
-    %-Conduct TDP-based clustering using adaptive thresholding algorithm
+    %-Conduct tdpCluster using adaptive thresholding algorithm
     %----------------------------------------------------------------------
     if isfield(xSPM,'tdpth')
         m = length(allp);
         rankp = zeros(m,1);
         rankp(ordp)  = 1:m;
-        [nclus,Lclus,tdpclus] = spm_aribrain_tdpCluster(allp,sortp,ordp,rankp,mask,varargins{:});
+        [~,Lclus,tdpclus] = spm_aribrain_tdpCluster(allp,sortp,ordp,rankp,mask,varargins{:});
 
         % update cluster info
         [x,y,z] = ind2sub(xSPM.DIM,find(Lclus~=0));
@@ -564,7 +564,7 @@ case 'table'                                                        %-Table
 
 
 
-            %-Compute TDP bound using ARIbrain
+            %-Compute TDP bounds for given clusters
             %--------------------------------------------------------------
             if isfield(xSPM,'tdpth')
 
@@ -600,7 +600,7 @@ case 'table'                                                        %-Table
             end
 
 
-            
+
         else
             Pz      = [];
             Pu      = [];
