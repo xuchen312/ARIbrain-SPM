@@ -63,13 +63,13 @@ Therefore, the ARI-based TDP inference could be separated into two parts:
   matlab -nodesktop -nosplash
   ```
   
-* Conduct the ARIbrain inference by running the function ```spm_aribrain``` with an even number of input arguments in the console. The function can be created using the following syntax:
+* Conduct the ARIbrain inference by running the function ```spm_aribrain``` with an even number of inputs in the console. For each input variable, the name of it should be first specified, and the value passed in to the function is followed. The function can be created using the following syntax:
   ```r
   spm_aribrain(['xSPM',xSPM,'alpha',alpha,'file',file,'simes',simes,'conn',conn,'tdpth',tdpth])
   ```
-  Here, at most 6 pairs of input arguments could be specified, where **clusterTDP** and **tdpCluster** require at most 8 and 12 inputs (i.e., 4 and 6 pairs), respectively.
+  Here, at most 6 input pairs could be specified, where **clusterTDP** and **tdpCluster** require at most 4 and 6 pairs (i.e., 8 and 12 input arguments), respectively.
 
-  - Parameters for **clusterTDP** & **tdpCluster**
+  - Input variables for **clusterTDP** & **tdpCluster**
   
       + ```xSPM``` an SPM input data structure detailed in ```spm_getSPM.m```. If not specified, it will be computed interactively.
    
