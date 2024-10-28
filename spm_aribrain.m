@@ -3,33 +3,33 @@ function varargout = spm_aribrain(varargin)
 % Run TDP inference using ARI
 %
 % =========================================================================
-% FORMAT:                          spm_aribrain(['xSPM',xSPM,'alpha',alpha,'conn',conn,'file',file,'simes',simes,'tdpth',tdpth])
-%         [hReg,xSPM,SPM,TabDat] = spm_aribrain(['xSPM',xSPM,'alpha',alpha,'conn',conn,'file',file,'simes',simes,'tdpth',tdpth])
+% FORMAT:                          spm_aribrain(['xSPM',xSPM,'alpha',alpha,'file',file,'simes',simes,'conn',conn,'tdpth',tdpth])
+%         [hReg,xSPM,SPM,TabDat] = spm_aribrain(['xSPM',xSPM,'alpha',alpha,'file',file,'simes',simes,'conn',conn,'tdpth',tdpth])
 % -------------------------------------------------------------------------
 % Inputs (optional; if empty or not specified, the default is used):
 %  -    xSPM: an input structure containing SPM, distribution & filtering
 %             details (see spm_getSPM.m for details; default: compute xSPM
 %             interactively)
 %  -   alpha: a significance level (default: 0.05)
-%  -    conn: a connectivity criterion (6 (face), 18 (edge) or 26 (vertex); 
-%             only needed for TDP-based clustering; default: 18)
 %  -    file: a character array specifying the file name for an output CSV
 %             file (default: output table is not saved)
 %  -   simes: a logical variable used to indicate Simes' (true, default) or
 %             Hommel's (false) robust test is conducted
-%  -   tdpth: a chosen TDP threshold (if specified and non-empty, TDP-based
-%             clustering is performed; default: RFT-based clustering)
+%  -    conn: a connectivity criterion; 6 (face), 18 (edge, default) or 26 
+%             (vertex) (only needed for the tdpCluster inference)
+%  -   tdpth: a chosen TDP threshold (default: the clusterTDP inference 
+%             will be performed; only needed for the tdpCluster inference)
 %
 % Outputs (optional, for interactive exploration):
-%  -   hReg: handle of MIP XYZ registry object
-%            (see spm_XYZreg.m for details)
-%  -   xSPM: an evaluated/thresholded structure containing SPM,
-%            distribution & filtering details
-%            (see spm_getSPM.m for details)
-%  -    SPM: an SPM structure
-%            (see spm_getSPM.m for details)
-%  - TabDat: a structure containing table data with fields
-%            (see spm_clusterTDP_list.m for details)
+%  -    hReg: handle of MIP XYZ registry object
+%             (see spm_XYZreg.m for details)
+%  -    xSPM: an evaluated/thresholded structure containing SPM,
+%             distribution & filtering details
+%             (see spm_getSPM.m for details)
+%  -     SPM: an SPM structure
+%             (see spm_getSPM.m for details)
+%  -  TabDat: a structure containing table data with fields
+%             (see spm_clusterTDP_list.m for details)
 % =========================================================================
 %
 
@@ -60,13 +60,6 @@ while ~isempty(varargin)
                     error('spm_aribrain: ''alpha'' must be numeric & within (0,1)');
                 end
             end
-        case 'conn'
-            if ~isempty(varargin{2})
-                conn = varargin{2};
-                if conn ~= 6 && conn ~= 18 && conn ~= 26
-                    error('spm_aribrain: ''conn'' must be 6 (face), 18 (edge) or 26 (vertex)');
-                end
-            end
         case 'file'
             if ~isempty(varargin{2})
                 file = varargin{2};
@@ -92,10 +85,17 @@ while ~isempty(varargin)
                     error('spm_aribrain: ''simes'' must be logical');
                 end
             end
+        case 'conn'
+            if ~isempty(varargin{2})
+                conn = varargin{2};
+                if conn ~= 6 && conn ~= 18 && conn ~= 26
+                    error('spm_aribrain: ''conn'' must be 6 (face), 18 (edge) or 26 (vertex)');
+                end
+            end
         case 'tdpth'
             if ~isempty(varargin{2})
                 tdpth = varargin{2};
-                if ~isnumeric(tdpth) || tdpth <0 || tdpth >1
+                if ~isnumeric(tdpth) || tdpth < 0 || tdpth > 1
                     error('spm_aribrain: ''tdpth'' must be numeric & within [0,1]');
                 end
             end
@@ -116,8 +116,8 @@ end
 %-Compute TDP estimation summary table "TabDat"
 %----------------------------------------------------------------------
 if exist('alpha','var'); xSPM.alpha = alpha; end
-if exist('conn', 'var'); xSPM.conn  = conn;  end
 if exist('simes','var'); xSPM.simes = simes; end
+if exist('conn', 'var'); xSPM.conn  = conn;  end
 if exist('tdpth','var'); xSPM.tdpth = tdpth; end
 TabDat = spm_aribrain_list('List',xSPM,hReg);
 
