@@ -14,7 +14,7 @@ Therefore, the ARI-based TDP inference could be separated into two parts:
 
 1. **clusterTDP** - Given any arbitrary clusters, the corresponding TDP lower bounds are estimated using ARI.
 
-2. **tdpCluster** - Given a sufficiently high TDP threshold, maximal STCs are created using the adaptive thresholding algorithm.
+2. **tdpCluster** - Given a sufficient TDP threshold, maximal STCs are created using the adaptive thresholding algorithm.
 
 ## Installation
 
