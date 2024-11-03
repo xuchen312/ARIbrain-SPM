@@ -53,6 +53,14 @@ Therefore, the ARI-based TDP inference could be separated into two parts:
 
 ## Implementation
 
+* For a Linux server user, please connect to the remote server by enaabling X11 forwarding using the following command. This allows users to run graphical applications on the server and display them locally.
+  ```r
+  ssh -X username@server
+  ``` 
+  where ```username``` and ```server``` should be replaced with the username and address/hostname of the remote server, respectively.
+  
+  NOTE: X11 forwarding must also be enabled on the server.
+
 * Navigate to the folder for the ARIbrain-SPM toolbox with
   ```r
   cd .../ARIbrain-SPM
