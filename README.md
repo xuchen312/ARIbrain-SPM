@@ -20,7 +20,7 @@ Therefore, the ARI-based TDP inference could be separated into two parts:
 
 ### Prerequisites
 
-* For a Linux server user, please connect to the remote server by enaabling X11 forwarding using the following command. This allows users to run graphical applications on the server and display them locally.
+* For Linux server users, please connect to the remote server by enaabling X11 forwarding using the following command. This allows users to run graphical applications on the server and display them locally.
   ```r
   ssh -X username@server
   ``` 
