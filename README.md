@@ -20,19 +20,19 @@ Therefore, the ARI-based TDP inference could be separated into two parts:
 
 ### Prerequisites
 
-* For Linux server users, please connect to the remote server by enaabling X11 forwarding using the following command. This allows users to run graphical applications on the server and display them locally.
+* For Linux server users, please connect to the remote server by enaabling X11 forwarding using the following command:
   ```r
   ssh -X username@server
   ``` 
-  where ```username``` and ```server``` should be replaced with the username and address/hostname of the remote server, respectively.
+  where ```username``` and ```server``` should be replaced with the username and address/hostname of the remote server, respectively. This allows users to run graphical applications on the server and display them locally.
   
   NOTE: X11 forwarding must also be enabled on the server.
 
-* Please download and install Matlab. For macOS users, you could edit the ```.bash_profile``` file and add Matlab to the ```PATH``` by appending
+* Please download and install Matlab. For **Linux** or **macOS** users, you could edit the shell configuration file ```~/.bash_profile``` and change the ```PATH``` environment variable to allow executing Matlab from bash. This could be done by appending
   ``` r
-  export PATH=/Applications/MATLAB_***.app/bin:$PATH
+  export PATH=<path to Matlab bin directory>:$PATH
   ```
-  where the installed Matlab version ```MATLAB_***``` could be found by running ```matlabroot``` in Matlab.
+  to ```~/.bash_profile```, where ```<path to Matlab bin directory>``` is the ```bin``` subdirectory of the Matlab installation directory. On **macOS**, the Matlab bin directory is ```/Applications/MATLAB_***.app/bin```, where the installed Matlab version ```MATLAB_***``` could be found by running ```matlabroot``` in Matlab.
 
 * Please download SPM12 and add it to the Matlab search path. You could follow either
 
@@ -58,6 +58,8 @@ Therefore, the ARI-based TDP inference could be separated into two parts:
     ```r
     addpath(genpath('.../ARIbrain-SPM'))
     ```
+  
+  NOTE: the current version could be run directly on **Linux** and **macOS**. **Windows** users need an additional preparation step, which is available on request.
 
 ## Implementation
 
