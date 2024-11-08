@@ -20,19 +20,11 @@ Therefore, the ARI-based TDP inference could be separated into two parts:
 
 ### Prerequisites
 
-* For Linux server users, please connect to the remote server by enaabling X11 forwarding using the following command:
-  ```r
-  ssh -X username@server
-  ``` 
-  where ```username``` and ```server``` should be replaced with the username and address/hostname of the remote server, respectively. This allows users to run graphical applications on the server and display them locally.
-  
-  NOTE: X11 forwarding must also be enabled on the server.
-
-* Please download and install Matlab. For **Linux** or **macOS** users, you could edit the shell configuration file ```~/.bash_profile``` and change the ```PATH``` environment variable to allow executing Matlab from bash. This could be done by appending
+* Please download and install Matlab. For Linux or macOS users, you could edit the shell configuration file ```~/.bash_profile``` and change the ```PATH``` environment variable to allow executing Matlab from bash. This could be done by appending
   ``` r
   export PATH=<path to Matlab bin directory>:$PATH
   ```
-  to ```~/.bash_profile```, where ```<path to Matlab bin directory>``` is the ```bin``` subdirectory of the Matlab installation directory. On **macOS**, the Matlab bin directory is ```/Applications/MATLAB_***.app/bin```, where the installed Matlab version ```MATLAB_***``` could be found by running ```matlabroot``` in Matlab.
+  to ```.bash_profile```, where ```<path to Matlab bin directory>``` is the ```bin``` subdirectory of the Matlab installation directory. E.g., the Matlab bin directory on macOS is ```/Applications/MATLAB_***.app/bin```, where the installed Matlab version ```MATLAB_***``` could be found by running ```matlabroot``` in Matlab.
 
 * Please download SPM12 and add it to the Matlab search path. You could follow either
 
@@ -54,26 +46,33 @@ Therefore, the ARI-based TDP inference could be separated into two parts:
 
   + **HOME -> Set Path -> Add Folder...**
 
-  + Run the below script from Matlab console
+  + Run the below command from Matlab console
     ```r
     addpath(genpath('.../ARIbrain-SPM'))
     ```
   
-  NOTE: the current version could be run directly on **Linux** and **macOS**. **Windows** users need an additional preparation step, which is available on request.
+  <ins> NOTE </ins>: The current version could be run directly on **Linux** and **macOS**. **Windows** users need an additional preparation step, which is available on request.
 
 ## Implementation
 
-* Navigate to the folder for the ARIbrain-SPM toolbox with
+* For Linux server users, please connect to the remote server by enaabling X11 forwarding using the following command:
   ```r
-  cd .../ARIbrain-SPM
-  ```
+  ssh -X username@server
+  ``` 
+  where ```username``` and ```server``` should be replaced with the username and address/hostname of the remote server, respectively. This allows users to run graphical applications on the server and display them locally.
+  
+  NOTE: X11 forwarding must also be enabled on the server.
   
 * Launch Matlab, or execute Matlab from the Terminal (command prompt) without the full desktop GUI while still allowing to display graphs with the command
   ```r
   matlab -nodesktop -nosplash
   ```
   
-* Conduct the ARIbrain inference by running the function ```spm_aribrain``` with an even number of inputs in the console. For each input variable, the name of it should be first specified, and the value passed in to the function is followed. The function can be created using the following syntax:
+* Navigate to the folder for the ARIbrain-SPM toolbox:
+  ```r
+  cd .../ARIbrain-SPM
+  ```
+  and conduct the ARIbrain inference by running the function ```spm_aribrain``` with an even number of inputs in the console. For each input variable, the name of it should be first specified, and the value passed in to the function is followed. The function can be created using the following syntax:
   ```r
   spm_aribrain(['xSPM',xSPM,'alpha',alpha,'file',file,'simes',simes,'conn',conn,'tdpth',tdpth])
   ```
@@ -109,7 +108,7 @@ Therefore, the ARI-based TDP inference could be separated into two parts:
 
 ## Result Display
 
-The main **ARIbrain-SPM** results are summarised with a result table ```TabDat``` that can be printed on the Matlab console, visualised from the graphics window in SPM, returned to the workspace, and exported to a CSV file. Here, the summary table is highly related to the SPM12 statistics results table, and the summary variable ```TDP``` shows the lower bound of TDP bound, derived using ARIbrain. Examples of such summary tables are as follows:
+The main **ARIbrain-SPM** results are summarised with a result table ```TabDat``` that can be printed on the Matlab console, visualised from the graphics window in SPM, returned to the workspace, and exported to a CSV file. Here, the summary table is highly related to the SPM12 statistics results table, and the summary variable ```TDP``` shows the TDP lower bound, derived using ARIbrain. Examples of such summary tables are as follows:
 
 1. **clusterTDP**
    
